@@ -1,71 +1,53 @@
-# testvscodextension README
+# CommitGenAI
 
-This is the README for your extension "testvscodextension". After writing up a brief description, we recommend including the following sections.
+🤖 **Generate smart AI commit messages** based on your latest `git diff` directly inside Visual Studio Code!
 
-## Features
+## 🧠 What It Does
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- Scans your current unstaged Git changes (`git diff`)
+- Sends the diff to an AI-powered backend
+- Generates a clean, readable commit message
+- Lets you view it and copy it with one click
 
-For example if there is an image subfolder under your extension project workspace:
+## 🖼️ Sidebar UI
 
-\!\[feature X\]\(images/feature-x.png\)
+This extension adds a new icon in the Activity Bar:
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+1. Click the **CommitGenAI** icon on the left.
+2. Click **Generate** to create a commit message.
+3. Click **Copy** to put it on your clipboard.
 
-## Requirements
+## 🚀 How to Use
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+1. Open any Git-enabled workspace in VS Code.
+2. Make some changes (without committing).
+3. Open the **CommitGenAI** view from the sidebar.
+4. Click **Generate** → watch it think → copy the message!
 
-## Extension Settings
+## ⚙️ Requirements
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+- Git installed and initialized in your project
+- Internet access (to reach the AI backend)
 
-For example:
+## 🧪 Features
 
-This extension contributes the following settings:
+- Git integration
+- AI-generated commit messages
+- Copy to clipboard
+- VS Code theme integration
+- Works in the sidebar (Activity Bar)
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+## 💻 Developer
 
-## Known Issues
+Created by Samad Alakbarov. Backend is hosted on [Render](https://render.com).
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+## 📦 Extension Settings
 
-## Release Notes
+No configuration needed.
 
-Users appreciate release notes as you update your extension.
+## 📥 Installation
 
-### 1.0.0
+Install from VSIX:
 
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+```bash
+code --install-extension commitgenai-vscode-extension-0.0.1.vsix
