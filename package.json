@@ -8,7 +8,7 @@
     "vscode": "^1.60.0"
   },
   "activationEvents": [
-    "onCommand:commitgenai.openPanel"
+    "onView:commitGenAI.view"
   ],
   "main": "./out/extension.js",
   "scripts": {
@@ -27,11 +27,24 @@
     "vscode-test": "^1.6.0"
   },
   "contributes": {
-    "commands": [
-      {
-        "command": "commitgenai.openPanel",
-        "title": "CommitGenAI: Open Generator Panel"
-      }
-    ]
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "commitGenAI",
+          "title": "CommitGenAI",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "commitGenAI": [
+        {
+          "icon": "",
+          "type": "webview",
+          "id": "commitGenAI.view",
+          "name": "Generator"
+        }
+      ]
+    }
   }
 }
