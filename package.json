@@ -1,41 +1,37 @@
 {
-  "name": "testvscodextension",
-  "displayName": "testvscodextension",
-  "description": "",
+  "name": "commitgenai-vscode-extension",
+  "displayName": "CommitGenAI",
+  "description": "Generate and copy commit messages from your Git diff via AI",
   "version": "0.0.1",
+  "publisher": "your-publisher-name",
   "engines": {
-    "vscode": "^1.102.0"
+    "vscode": "^1.60.0"
   },
-  "categories": [
-    "Other"
+  "activationEvents": [
+    "onCommand:commitgenai.openPanel"
   ],
-  "activationEvents": [],
   "main": "./out/extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "commitgenai.sendGitDiff",
-        "title": "Send Git Diff to Backend"
-      }
-    ]
-  },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "node-fetch": "^3.4.0"
   },
   "devDependencies": {
-    "@types/vscode": "^1.102.0",
-    "@types/mocha": "^10.0.10",
-    "@types/node": "20.x",
-    "@typescript-eslint/eslint-plugin": "^8.31.1",
-    "@typescript-eslint/parser": "^8.31.1",
-    "eslint": "^9.25.1",
-    "typescript": "^5.8.3",
-    "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "@types/vscode": "^1.60.0",
+    "@types/node": "^14.14.37",
+    "@types/node-fetch": "^2.5.12",
+    "typescript": "^4.4.3",
+    "vscode-test": "^1.6.0"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "commitgenai.openPanel",
+        "title": "CommitGenAI: Open Generator Panel"
+      }
+    ]
   }
 }
