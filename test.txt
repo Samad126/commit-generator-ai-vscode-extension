@@ -1,0 +1,8 @@
+  // "contributes": {
+  //   "commands": [
+  //     {
+  //       "command": "testvscodextension.helloWorld",
+  //       "title": "Hello World"
+  //     }
+  //   ]
+  // },
