@@ -3,7 +3,7 @@
   "displayName": "CommitGenAI",
   "description": "Generate and copy commit messages from your Git diff via AI",
   "version": "0.0.1",
-  "publisher": "your-publisher-name",
+  "publisher": "SamadsCreations",
   "engines": {
     "vscode": "^1.60.0"
   },
