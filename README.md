@@ -16,6 +16,7 @@ This extension adds a new icon in the Activity Bar:
 1. Click the **CommitGenAI** icon on the left.
 2. Click **Generate** to create a commit message.
 3. Click **Copy** to put it on your clipboard.
+4. Click **Commit** to commit with generated message.
 
 ## 🚀 How to Use
 

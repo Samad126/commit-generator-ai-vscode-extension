@@ -98,8 +98,8 @@ class CommitGenAIViewProvider implements vscode.WebviewViewProvider {
               this._view.webview.postMessage({ command: 'error', text: 'No workspace folder open.' });
               return;
             }
-            exec(
-              `git commit -m "${msg.text.replace(/"/g, '\\"')}"`,
+            const commitProcess = exec(
+              'git commit -F -',
               { cwd: folders[0].uri.fsPath },
               (err, stdout, stderr) => {
                 if (err) {
@@ -115,6 +115,9 @@ class CommitGenAIViewProvider implements vscode.WebviewViewProvider {
                 }
               }
             );
+
+            commitProcess.stdin?.write(msg.text + '\n');
+            commitProcess.stdin?.end();
             break;
           }
         }
