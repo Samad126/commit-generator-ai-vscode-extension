@@ -4,6 +4,10 @@ All notable changes to the "testvscodextension" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.0.5]
+
+- test fix for to track newly added files
+
 ## [0.0.4]
 
 - different strategy for commit message

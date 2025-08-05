@@ -47,43 +47,45 @@ class CommitGenAIViewProvider implements vscode.WebviewViewProvider {
             }
             w.postMessage({ command: 'loading' });
 
-            exec('git diff', { cwd: folders[0].uri.fsPath }, async (err, stdout) => {
-              if (err) {
-                w.postMessage({ command: 'error', text: `Git diff failed: ${err.message}` });
-                return;
-              }
-              if (!stdout.trim()) {
-                w.postMessage({ command: 'info', text: 'No unstaged changes detected.' });
-                return;
-              }
-
-              try {
-                const fetch = (await import('node-fetch')).default;
-                const res = await fetch(BACKEND_URL, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ plainText: stdout, isPair: false })
-                });
-
-                if (!res.ok) {
-                  const errText = await res.text();
-                  w.postMessage({
-                    command: 'error',
-                    text: `Backend ${res.status}: ${res.statusText}\n${errText}`
-                  });
+            // 1) mark untracked files as "intent to add", 2) show diffs of modifications & new files
+            exec(
+              'git add -N .; git diff; git diff --cached',
+              { cwd: folders[0].uri.fsPath },
+              async (err, stdout) => {
+                // git diff returns exit-code 1 when diffs exist → ignore err
+                if (!stdout.trim()) {
+                  w.postMessage({ command: 'info', text: 'No changes detected.' });
                   return;
                 }
 
-                const data = (await res.json()) as { aiResponse: string };
-                w.postMessage({ command: 'show', text: data.aiResponse });
+                try {
+                  const fetch = (await import('node-fetch')).default;
+                  const res = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plainText: stdout, isPair: false })
+                  });
 
-              } catch (e) {
-                w.postMessage({
-                  command: 'error',
-                  text: `Network error: ${(e as Error).message}`
-                });
+                  if (!res.ok) {
+                    const errText = await res.text();
+                    w.postMessage({
+                      command: 'error',
+                      text: `Backend ${res.status}: ${res.statusText}\n${errText}`
+                    });
+                    return;
+                  }
+
+                  const data = (await res.json()) as { aiResponse: string };
+                  w.postMessage({ command: 'show', text: data.aiResponse });
+
+                } catch (e) {
+                  w.postMessage({
+                    command: 'error',
+                    text: `Network error: ${(e as Error).message}`
+                  });
+                }
               }
-            });
+            );
             break;
           }
 
@@ -99,7 +101,7 @@ class CommitGenAIViewProvider implements vscode.WebviewViewProvider {
               return;
             }
 
-            // Stage all changes, then read message from stdin
+            // Stage *all* changes (new, modified, deleted) then commit via stdin
             const commitProcess = exec(
               'git add -A && git commit -F -',
               { cwd: folders[0].uri.fsPath },
