@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
 import { exec } from 'child_process';
+import { promisify } from 'util';
 
 const BACKEND_URL =
   'https://commit-generator-ai-backend.onrender.com/generator/generate-commit-message';
+
+const execAsync = promisify(exec);
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
@@ -32,103 +35,121 @@ class CommitGenAIViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this.getHtml(webviewView.webview);
 
     webviewView.webview.onDidReceiveMessage(
-      async (msg) => {
-        if (!this._view) {
-          return;
-        }
-        const w = this._view.webview;
-
-        switch (msg.command) {
-          case 'generate': {
-            const folders = vscode.workspace.workspaceFolders;
-            if (!folders) {
-              w.postMessage({ command: 'error', text: 'Please open a workspace first.' });
-              return;
-            }
-            w.postMessage({ command: 'loading' });
-
-            // 1) mark untracked files as "intent to add", 2) show diffs of modifications & new files
-            exec(
-              'git add -N .; git diff; git diff --cached',
-              { cwd: folders[0].uri.fsPath },
-              async (err, stdout) => {
-                // git diff returns exit-code 1 when diffs exist → ignore err
-                if (!stdout.trim()) {
-                  w.postMessage({ command: 'info', text: 'No changes detected.' });
-                  return;
-                }
-
-                try {
-                  const fetch = (await import('node-fetch')).default;
-                  const res = await fetch(BACKEND_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ plainText: stdout, isPair: false })
-                  });
-
-                  if (!res.ok) {
-                    const errText = await res.text();
-                    w.postMessage({
-                      command: 'error',
-                      text: `Backend ${res.status}: ${res.statusText}\n${errText}`
-                    });
-                    return;
-                  }
-
-                  const data = (await res.json()) as { aiResponse: string };
-                  w.postMessage({ command: 'show', text: data.aiResponse });
-
-                } catch (e) {
-                  w.postMessage({
-                    command: 'error',
-                    text: `Network error: ${(e as Error).message}`
-                  });
-                }
-              }
-            );
-            break;
-          }
-
-          case 'copy':
-            await vscode.env.clipboard.writeText(msg.text);
-            vscode.window.showInformationMessage('Commit message copied!');
-            break;
-
-          case 'commit': {
-            const folders = vscode.workspace.workspaceFolders;
-            if (!folders) {
-              this._view.webview.postMessage({ command: 'error', text: 'No workspace folder open.' });
-              return;
-            }
-
-            // Stage *all* changes (new, modified, deleted) then commit via stdin
-            const commitProcess = exec(
-              'git add -A && git commit -F -',
-              { cwd: folders[0].uri.fsPath },
-              (err, stdout, stderr) => {
-                if (err) {
-                  this._view?.webview.postMessage({
-                    command: 'error',
-                    text: `Commit failed: ${stderr?.trim() || err.message}`
-                  });
-                } else {
-                  this._view?.webview.postMessage({
-                    command: 'info',
-                    text: '✅ Commit created successfully!'
-                  });
-                }
-              }
-            );
-
-            commitProcess.stdin?.write(msg.text + '\n');
-            commitProcess.stdin?.end();
-            break;
-          }
-        }
-      },
+      msg => this.handleMessage(msg),
       undefined,
       this.context.subscriptions
     );
+  }
+
+  private async handleMessage(msg: any) {
+    if (!this._view) {
+      return;
+    }
+    const w = this._view.webview;
+
+    switch (msg.command) {
+      case 'generate': {
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders) {
+          w.postMessage({ command: 'error', text: 'Please open a workspace first.' });
+          return;
+        }
+        w.postMessage({ command: 'loading' });
+
+        const cwd = folders[0].uri.fsPath;
+        try {
+          // 1) Mark untracked files as "intent to add" (ignore any errors)
+          try {
+            await execAsync('git add -N .', { cwd });
+          } catch { /* no-op */ }
+
+          // 2) Collect unstaged diff
+          let diff = '';
+          try {
+            const { stdout } = await execAsync('git diff', { cwd });
+            diff += stdout;
+          } catch (e: any) {
+            diff += e.stdout ?? '';
+          }
+
+          // 3) Collect staged diff
+          try {
+            const { stdout } = await execAsync('git diff --cached', { cwd });
+            diff += stdout;
+          } catch (e: any) {
+            diff += e.stdout ?? '';
+          }
+
+          if (!diff.trim()) {
+            w.postMessage({ command: 'info', text: 'No changes detected.' });
+            return;
+          }
+
+          // 4) Send to AI backend
+          const fetch = (await import('node-fetch')).default;
+          const res = await fetch(BACKEND_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plainText: diff, isPair: false })
+          });
+
+          if (!res.ok) {
+            const errText = await res.text();
+            w.postMessage({
+              command: 'error',
+              text: `Backend ${res.status}: ${res.statusText}\n${errText}`
+            });
+            return;
+          }
+
+          const data = (await res.json()) as { aiResponse: string };
+          w.postMessage({ command: 'show', text: data.aiResponse });
+
+        } catch (e: any) {
+          w.postMessage({
+            command: 'error',
+            text: `Error generating diff: ${e.message}`
+          });
+        }
+        break;
+      }
+
+      case 'copy':
+        await vscode.env.clipboard.writeText(msg.text);
+        vscode.window.showInformationMessage('Commit message copied!');
+        break;
+
+      case 'commit': {
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders) {
+          w.postMessage({ command: 'error', text: 'No workspace folder open.' });
+          return;
+        }
+
+        // Stage all changes and commit
+        const commitProcess = exec(
+          'git add -A && git commit -F -',
+          { cwd: folders[0].uri.fsPath },
+          (err, stdout, stderr) => {
+            if (err) {
+              w.postMessage({
+                command: 'error',
+                text: `Commit failed: ${stderr?.trim() || err.message}`
+              });
+            } else {
+              w.postMessage({
+                command: 'info',
+                text: '✅ Commit created successfully!'
+              });
+            }
+          }
+        );
+
+        commitProcess.stdin?.write(msg.text + '\n');
+        commitProcess.stdin?.end();
+        break;
+      }
+    }
   }
 
   private getHtml(webview: vscode.Webview): string {
