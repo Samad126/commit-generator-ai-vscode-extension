@@ -33,64 +33,90 @@ class CommitGenAIViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.onDidReceiveMessage(
       async (msg) => {
-        if (!this._view) { return; }
+        if (!this._view) {
+          return;
+        }
         const w = this._view.webview;
 
         switch (msg.command) {
-          case 'generate':
-            {
-              const folders = vscode.workspace.workspaceFolders;
-              if (!folders) {
-                w.postMessage({ command: 'error', text: 'Please open a workspace first.' });
+          case 'generate': {
+            const folders = vscode.workspace.workspaceFolders;
+            if (!folders) {
+              w.postMessage({ command: 'error', text: 'Please open a workspace first.' });
+              return;
+            }
+            w.postMessage({ command: 'loading' });
+
+            exec('git diff', { cwd: folders[0].uri.fsPath }, async (err, stdout) => {
+              if (err) {
+                w.postMessage({ command: 'error', text: `Git diff failed: ${err.message}` });
                 return;
               }
-              // show loading in the webview
-              w.postMessage({ command: 'loading' });
+              if (!stdout.trim()) {
+                w.postMessage({ command: 'info', text: 'No unstaged changes detected.' });
+                return;
+              }
 
-              exec('git diff', { cwd: folders[0].uri.fsPath }, async (err, stdout) => {
-                if (err) {
-                  w.postMessage({ command: 'error', text: `Git diff failed: ${err.message}` });
-                  return;
-                }
-                if (!stdout.trim()) {
-                  w.postMessage({ command: 'info', text: 'No unstaged changes detected.' });
-                  return;
-                }
+              try {
+                const fetch = (await import('node-fetch')).default;
+                const res = await fetch(BACKEND_URL, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ plainText: stdout, isPair: false })
+                });
 
-                try {
-                  const fetch = (await import('node-fetch')).default;
-                  const res = await fetch(BACKEND_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ plainText: stdout, isPair: false })
-                  });
-
-                  if (!res.ok) {
-                    const errText = await res.text();
-                    w.postMessage({
-                      command: 'error',
-                      text: `Backend ${res.status}: ${res.statusText}\n${errText}`
-                    });
-                    return;
-                  }
-
-                  const data = await res.json() as { aiResponse: string };
-                  w.postMessage({ command: 'show', text: data.aiResponse });
-
-                } catch (e) {
+                if (!res.ok) {
+                  const errText = await res.text();
                   w.postMessage({
                     command: 'error',
-                    text: `Network error: ${(e as Error).message}`
+                    text: `Backend ${res.status}: ${res.statusText}\n${errText}`
                   });
+                  return;
                 }
-              });
-            }
+
+                const data = (await res.json()) as { aiResponse: string };
+                w.postMessage({ command: 'show', text: data.aiResponse });
+
+              } catch (e) {
+                w.postMessage({
+                  command: 'error',
+                  text: `Network error: ${(e as Error).message}`
+                });
+              }
+            });
             break;
+          }
 
           case 'copy':
             await vscode.env.clipboard.writeText(msg.text);
             vscode.window.showInformationMessage('Commit message copied!');
             break;
+
+          case 'commit': {
+            const folders = vscode.workspace.workspaceFolders;
+            if (!folders) {
+              this._view.webview.postMessage({ command: 'error', text: 'No workspace folder open.' });
+              return;
+            }
+            exec(
+              `git commit -m "${msg.text.replace(/"/g, '\\"')}"`,
+              { cwd: folders[0].uri.fsPath },
+              (err, stdout, stderr) => {
+                if (err) {
+                  this._view?.webview.postMessage({
+                    command: 'error',
+                    text: `Commit failed: ${stderr || err.message}`
+                  });
+                } else {
+                  this._view?.webview.postMessage({
+                    command: 'info',
+                    text: '✅ Commit created successfully!'
+                  });
+                }
+              }
+            );
+            break;
+          }
         }
       },
       undefined,
@@ -171,6 +197,7 @@ class CommitGenAIViewProvider implements vscode.WebviewViewProvider {
     <div class="controls">
       <button id="generate">Generate</button>
       <button id="copy" disabled>Copy</button>
+      <button id="commitNow" disabled>Commit</button>
     </div>
     <div id="status">Click “Generate” to start</div>
     <pre id="commit">Your commit message will appear here…</pre>
@@ -180,18 +207,18 @@ class CommitGenAIViewProvider implements vscode.WebviewViewProvider {
     const vscode = acquireVsCodeApi();
     const genBtn = document.getElementById('generate');
     const copyBtn = document.getElementById('copy');
+    const commitNowBtn = document.getElementById('commitNow');
     const statusEl = document.getElementById('status');
     const commitEl = document.getElementById('commit');
 
-    // When clicked, show loading immediately and send request
     genBtn.addEventListener('click', () => {
       statusEl.textContent = 'Generating… ⏳';
       commitEl.textContent = '';
       copyBtn.disabled = true;
+      commitNowBtn.disabled = true;
       vscode.postMessage({ command: 'generate' });
     });
 
-    // Copy the shown text
     copyBtn.addEventListener('click', () => {
       vscode.postMessage({
         command: 'copy',
@@ -199,19 +226,26 @@ class CommitGenAIViewProvider implements vscode.WebviewViewProvider {
       });
     });
 
-    // Handle messages from extension
+    commitNowBtn.addEventListener('click', () => {
+      vscode.postMessage({
+        command: 'commit',
+        text: commitEl.textContent
+      });
+    });
+
     window.addEventListener('message', event => {
       const msg = event.data;
       if (msg.command === 'show') {
         statusEl.textContent = 'Done! 🎉';
         commitEl.textContent = msg.text;
         copyBtn.disabled = false;
+        commitNowBtn.disabled = false;
       } else if (msg.command === 'info') {
         statusEl.textContent = msg.text;
       } else if (msg.command === 'error') {
         statusEl.textContent = '❗ ' + msg.text;
       } else if (msg.command === 'loading') {
-        // we already set loading in click handler, but you can handle it here too
+        // already handled above
       }
     });
   </script>
